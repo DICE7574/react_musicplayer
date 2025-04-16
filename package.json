@@ -21,6 +21,8 @@
   "author": "DICE",
   "description": "",
   "dependencies": {
+    "bootstrap": "^5.3.5",
+    "bootstrap-icons": "^1.11.3",
     "electron": "^35.1.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

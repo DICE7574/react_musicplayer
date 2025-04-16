@@ -1,5 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import YouTube from 'react-youtube';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function App() {
     const youtubeId = "N6DMXNyvAxs"; // 유튜브 영상 ID
