@@ -4,19 +4,27 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function App() {
-    const youtubeId = "N6DMXNyvAxs"; // 유튜브 영상 ID
+    const youtubeId = "0RkX1mBIjRA";
+    const youtubeListID = "PLeSslQPAX32g8skK9TpiAJWqtobywviTp";
     const playerRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [volume, setVolume] = useState(0.2);  // 초기 볼륨 20%
+    const [volume, setVolume] = useState(0.2);
     const [isMuted, setIsMuted] = useState(false);
-    const [isLooping, setIsLooping] = useState(false);
+    const [repeatMode, setRepeatMode] = useState("none"); // none, one, all
 
     const onReady = (event) => {
         playerRef.current = event.target;
-        setDuration(event.target.getDuration());
+        updateVideoInfo();
         event.target.setVolume(volume * 100);
+    };
+
+    const updateVideoInfo = () => {
+        if (playerRef.current) {
+            setDuration(playerRef.current.getDuration());
+            setCurrentTime(playerRef.current.getCurrentTime());
+        }
     };
 
     const togglePlayPause = () => {
@@ -28,13 +36,6 @@ function App() {
             playerRef.current.playVideo();
         }
         setIsPlaying(!isPlaying);
-    };
-
-    const stop = () => {
-        if (playerRef.current) {
-            playerRef.current.stopVideo();
-            setIsPlaying(false);
-        }
     };
 
     const handleSeek = (e) => {
@@ -56,20 +57,41 @@ function App() {
         if (playerRef.current) {
             if (isMuted) {
                 playerRef.current.unMute();
-                playerRef.current.setVolume(volume * 100);  // 볼륨 복원
+                playerRef.current.setVolume(volume * 100);
             } else {
                 playerRef.current.mute();
             }
         }
     };
 
-    const toggleLoop = () => {
-        setIsLooping(!isLooping);
-        if (isLooping) {
-            playerRef.current.setLoop(false);  // 반복 해제
-        } else {
-            playerRef.current.setLoop(true);  // 반복 설정
+    const toggleRepeatMode = () => {
+        const nextMode = repeatMode === "none" ? "one" : repeatMode === "one" ? "all" : "none";
+        setRepeatMode(nextMode);
+
+        if (playerRef.current) {
+            if (nextMode === "one") {
+                playerRef.current.setLoop(true);
+            } else {
+                playerRef.current.setLoop(false);
+            }
         }
+    };
+
+    const playPrevious = () => {
+        if (!playerRef.current) return;
+
+        const current = playerRef.current.getCurrentTime();
+        if (current > 5) {
+            playerRef.current.seekTo(0, true);
+        } else {
+            playerRef.current.previousVideo();
+        }
+    };
+
+    const playNext = () => {
+        if (!playerRef.current) return;
+
+        playerRef.current.nextVideo();
     };
 
     useEffect(() => {
@@ -87,22 +109,31 @@ function App() {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     };
 
+    const getRepeatIcon = () => {
+        if (repeatMode === "one") return "bi-repeat-1";
+        if (repeatMode === "all") return "bi-repeat";
+        return "bi-repeat"; // none 상태에서 bi-repeat로 변경
+    };
+
+    const getRepeatButtonClass = () => {
+        return repeatMode === "none" ? "btn-dark" : "btn-info";
+    };
+
     return (
         <div className="container mt-4">
-            {/* 유튜브 영상 */}
             <YouTube
                 videoId={youtubeId}
                 opts={{
                     width: "0",
                     height: "0",
-                    playerVars: { autoplay: 0 },
+                    playerVars: {
+                        listType: 'playlist',
+                        list: youtubeListID,
+                        autoplay: 0
+                    },
                 }}
                 onReady={onReady}
-                onEnd={() => {
-                    if (isLooping && playerRef.current) {
-                        playerRef.current.playVideo(); // 반복 모드일 때 비디오가 끝나면 다시 재생
-                    }
-                }}
+                onStateChange={updateVideoInfo}
                 style={{ pointerEvents: 'none' }}
             />
 
@@ -118,20 +149,23 @@ function App() {
                         onChange={handleSeek}
                     />
                     <span style={{ minWidth: 80 }}>
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
+                        {formatTime(currentTime)} / {formatTime(duration)}
+                    </span>
                 </div>
 
-                {/* 컨트롤 버튼 */}
                 <div className="d-flex justify-content-center gap-3">
+                    <button className="btn btn-outline-secondary" onClick={playPrevious}>
+                        <i className="bi bi-skip-backward-fill"></i>
+                    </button>
+
                     <button className="btn btn-primary" onClick={togglePlayPause}>
                         <i className={`bi ${isPlaying ? "bi-pause-fill" : "bi-play-fill"}`}></i>
                     </button>
-                    <button className="btn btn-danger" onClick={stop}>
-                        <i className="bi bi-stop-fill"></i>
+
+                    <button className="btn btn-outline-secondary" onClick={playNext}>
+                        <i className="bi bi-skip-forward-fill"></i>
                     </button>
 
-                    {/* 볼륨 조절 */}
                     <button className="btn btn-light" onClick={toggleMute}>
                         <i className={`bi ${isMuted ? "bi-volume-mute" : "bi-volume-up"}`}></i>
                     </button>
@@ -139,7 +173,7 @@ function App() {
                     <div className="d-flex align-items-center gap-2">
                         <input
                             type="range"
-                            className="form-range custom-range-red"
+                            className="form-range"
                             min="0"
                             max="1"
                             step="0.01"
@@ -149,12 +183,8 @@ function App() {
                         />
                     </div>
 
-                    {/* 반복 재생 버튼 */}
-                    <button
-                        className={`btn ${isLooping ? "btn-info" : "btn-dark"}`}
-                        onClick={toggleLoop}
-                    >
-                        <i className="bi bi-repeat"></i>
+                    <button className={`btn ${getRepeatButtonClass()}`} onClick={toggleRepeatMode}>
+                        <i className={`bi ${getRepeatIcon()}`}></i>
                     </button>
                 </div>
             </div>
