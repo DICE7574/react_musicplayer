@@ -5,8 +5,8 @@ let mainWindow;
 
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
-        width: 1100,
-        height: 280,
+        width: 1920,
+        height: 1080,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
         },
