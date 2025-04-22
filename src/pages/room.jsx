@@ -1,17 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import YouTube from 'react-youtube';
 import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import RoomHeader from '../components/RoomHeader';
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
 function Room() {
     const { roomCode } = useParams();
     const location = useLocation();
+    const navigate = useNavigate();
     const nickname = location.state?.nickname || '익명';
 
     const youtubeId = "0RkX1mBIjRA";
@@ -27,6 +29,8 @@ function Room() {
     const [volume, setVolume] = useState(0.2);
     const [isMuted, setIsMuted] = useState(false);
     const [repeatMode, setRepeatMode] = useState("none");
+    const [showCode, setShowCode] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         const fetchRoomData = async () => {
@@ -126,6 +130,38 @@ function Room() {
 
     const formatTime = (s) => `${Math.floor(s / 60)}:${('0' + Math.floor(s % 60)).slice(-2)}`;
 
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(roomCode).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        });
+    };
+
+    const handleLeaveRoom = () => {
+        socket.emit('leave-room', { roomCode });
+        navigate('/');
+    };
+
+
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            e.preventDefault();
+            e.returnValue = ''; // 경고 창 띄우기
+        };
+
+        const handlePageHide = () => {
+            socket.emit('leave-room', { roomCode });
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('pagehide', handlePageHide); // 진짜 떠날 때 실행됨
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('pagehide', handlePageHide);
+        };
+    }, [roomCode]);
+
     return (
         <div className="container mt-4 position-relative">
             <YouTube
@@ -144,70 +180,78 @@ function Room() {
                 style={{ pointerEvents: 'none' }}
             />
 
-            <div className="d-flex align-items-center gap-2 mb-3">
-                <div className="dropdown">
-                    <button
-                        className="btn btn-outline-secondary btn-sm dropdown-toggle"
-                        type="button"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
-                    >
-                        {members.length} <i className="bi bi-people-fill"></i>
-                    </button>
-                    <ul className="dropdown-menu">
-                        {members.map((name, idx) => (
-                            <li key={idx}>
-                                <div className={`dropdown-item d-flex justify-content-between align-items-center ${name === nickname ? 'bg-secondary text-white' : ''}`}> {/* 내 낵네임 회색 바탕 표현 */}
-                                    <span>{name}</span>
-                                    {idx === 0 && <span className="ms-2">⭐</span>} {/* 방장 표시 */}
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <h4 className="mb-0">{roomName}</h4>
-            </div>
+            {/* 상단 정보 */}
+            <RoomHeader
+                roomName={roomName}
+                roomCode={roomCode}
+                members={members}
+                nickname={nickname}
+                showCode={showCode}
+                setShowCode={setShowCode}
+                copyToClipboard={copyToClipboard}
+                copied={copied}
+                handleLeaveRoom={handleLeaveRoom}
+            />
 
+            {/* 플레이어 */}
             <div className="card p-4 shadow-sm">
-                <div className="d-flex align-items-center mb-3">
+                <div className="mb-3">
                     <input
                         type="range"
-                        className="form-range flex-grow-1 me-3"
+                        className="form-range"
                         min="0"
                         max={duration}
                         step="0.1"
                         value={currentTime}
                         onChange={handleSeek}
                     />
-                    <span style={{ minWidth: 80 }}>{formatTime(currentTime)} / {formatTime(duration)}</span>
                 </div>
 
-                <div className="d-flex justify-content-center gap-3">
-                    <button className="btn btn-outline-secondary" onClick={playPrevious}>
-                        <i className="bi bi-skip-backward-fill"></i>
-                    </button>
-                    <button className="btn btn-primary" onClick={togglePlayPause}>
-                        <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'}`}></i>
-                    </button>
-                    <button className="btn btn-outline-secondary" onClick={playNext}>
-                        <i className="bi bi-skip-forward-fill"></i>
-                    </button>
-                    <button className="btn btn-light" onClick={toggleMute}>
-                        <i className={`bi ${isMuted ? 'bi-volume-mute' : 'bi-volume-up'}`}></i>
-                    </button>
-                    <input
-                        type="range"
-                        className="form-range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={volume}
-                        onChange={handleVolumeChange}
-                        style={{ width: '80px' }}
-                    />
-                    <button className={`btn ${repeatMode === 'none' ? 'btn-dark' : 'btn-info'}`} onClick={toggleRepeatMode}>
-                        <i className={`bi ${repeatMode === 'one' ? 'bi-repeat-1' : 'bi-repeat'}`}></i>
-                    </button>
+                <div className="d-flex justify-content-between align-items-center">
+                    {/* 왼쪽: 이전/재생/다음 + 현재시간 */}
+                    <div className="d-flex align-items-center gap-2">
+                        <button className="btn btn-light" onClick={playPrevious}>
+                            <i className="bi bi-skip-backward-fill"></i>
+                        </button>
+                        <button className="btn btn-outline-primary" onClick={togglePlayPause}>
+                            <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'}`}></i>
+                        </button>
+                        <button className="btn btn-light" onClick={playNext}>
+                            <i className="bi bi-skip-forward-fill"></i>
+                        </button>
+                        <span className="text-muted small">
+                            {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                    </div>
+
+                    {/* 가운데: 노래 정보 (임시 텍스트) */}
+                    <div className="text-center flex-grow-1">
+                        <span className="text-secondary d-block">노래 제목</span>
+                        <span className="text-secondary d-block">아티스트 정보</span>
+                    </div>
+
+                    {/* 오른쪽: 음소거 및 볼륨 */}
+                    <div className="d-flex align-items-center gap-2">
+                        <button className="btn btn-light" onClick={toggleMute}>
+                            <i className={`bi ${isMuted ? 'bi-volume-mute' : 'bi-volume-up'}`}></i>
+                        </button>
+                        <input
+                            type="range"
+                            className="form-range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={volume}
+                            onChange={handleVolumeChange}
+                            style={{ width: '100px' }}
+                        />
+                        <button
+                            className={`btn ${repeatMode === 'none' ? 'btn-outline-dark' : 'btn-outline-info'}`}
+                            onClick={toggleRepeatMode}
+                        >
+                            <i className={`bi ${repeatMode === 'one' ? 'bi-repeat-1' : 'bi-repeat'}`}></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
