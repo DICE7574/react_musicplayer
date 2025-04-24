@@ -33,22 +33,39 @@ function Room() {
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
-        const fetchRoomData = async () => {
-            try {
-                const titleRes = await axios.get(`${API}/room/${roomCode}/title`);
-                const membersRes = await axios.get(`${API}/room/${roomCode}/members`);
-                const playlistRes = await axios.get(`${API}/room/${roomCode}/playlist`);
+        const connectAndFetch = async () => {
+            if (!nickname || !roomCode) return;
 
-                if (titleRes.data.success) setRoomName(titleRes.data.roomName);
-                if (membersRes.data.success) setMembers(membersRes.data.members);
-                if (playlistRes.data.success) setPlaylist(playlistRes.data.playlist);
-            } catch (err) {
-                console.error('초기화 실패:', err);
-            }
+            if (!socket.connected) socket.connect();
+
+            socket.emit('connect-room', { roomCode, userName: nickname }, async (res) => {
+                if (!res.success) {
+                    alert(res.message || '방 연결에 실패했습니다.');
+                    socket.disconnect();
+                    navigate('/');
+                    return;
+                }
+
+                // ✅ 연결 성공 후 데이터 요청
+                try {
+                    const [titleRes, membersRes, playlistRes] = await Promise.all([
+                        axios.get(`${API}/room/${roomCode}/title`),
+                        axios.get(`${API}/room/${roomCode}/members`),
+                        axios.get(`${API}/room/${roomCode}/playlist`)
+                    ]);
+
+                    if (titleRes.data.success) setRoomName(titleRes.data.roomName);
+                    if (membersRes.data.success) setMembers(membersRes.data.members);
+                    if (playlistRes.data.success) setPlaylist(playlistRes.data.playlist);
+                } catch (err) {
+                    console.error('초기화 실패:', err);
+                }
+            });
         };
 
-        fetchRoomData();
-    }, [roomCode]);
+        connectAndFetch();
+    }, [roomCode, nickname]);
+
 
     useEffect(() => {
         const handleMemberUpdate = (updated) => setMembers(updated);
@@ -139,6 +156,7 @@ function Room() {
 
     const handleLeaveRoom = () => {
         socket.emit('leave-room', { roomCode });
+        socket.disconnect();
         navigate('/');
     };
 
@@ -151,6 +169,7 @@ function Room() {
 
         const handlePageHide = () => {
             socket.emit('leave-room', { roomCode });
+            socket.disconnect();
         };
 
         window.addEventListener('beforeunload', handleBeforeUnload);

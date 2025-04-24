@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { socket } from '../socket';
 
 function Lobby() {
     const navigate = useNavigate();
@@ -13,18 +12,8 @@ function Lobby() {
     const [roomTitleError, setRoomTitleError] = useState('');
     const [inviteCodeError, setInviteCodeError] = useState('');
 
-    // ✅ room-created 이벤트 한 번만 등록
-    useEffect(() => {
-        const handleRoomCreated = ({ inviteCode }) => {
-            navigate(`/room/${inviteCode}`, { state: { nickname } });
-        };
-
-        socket.on('room-created', handleRoomCreated);
-        return () => socket.off('room-created', handleRoomCreated);
-    }, [navigate, nickname]);
-
     // ✅ 방 생성
-    const handleCreateRoom = () => {
+    const handleCreateRoom = async () => {
         let hasError = false;
 
         if (!nickname.trim()) {
@@ -43,14 +32,24 @@ function Lobby() {
 
         if (hasError) return;
 
-        socket.emit('create-room', {
-            roomName: roomTitle.trim(),
-            userName: nickname.trim()
-        });
+        try {
+            const res = await fetch('http://localhost:3001/room/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomTitle: roomTitle.trim() })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                navigate(`/room/${data.inviteCode}`, { state: { nickname } });
+            }
+        } catch (err) {
+            console.error('방 생성 실패:', err);
+        }
     };
 
     // ✅ 방 참가
-    const handleJoinRoom = () => {
+    const handleJoinRoom = async () => {
         let hasError = false;
 
         if (!nickname.trim()) {
@@ -69,17 +68,26 @@ function Lobby() {
 
         if (hasError) return;
 
-        socket.emit(
-            'join-room',
-            { inviteCode: inviteCode.trim(), userName: nickname.trim() },
-            (response) => {
-                if (response.success) {
-                    navigate(`/room/${inviteCode}`, { state: { nickname } });
-                } else {
-                    setInviteCodeError(response.message || '방 참가에 실패했습니다.');
-                }
+        try {
+            const res = await fetch('http://localhost:3001/room/join', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomCode: inviteCode.trim(),
+                    userName: nickname.trim()
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                navigate(`/room/${inviteCode}`, { state: { nickname } });
+            } else {
+                setInviteCodeError(data.message || '방 참가에 실패했습니다.');
             }
-        );
+        } catch (err) {
+            console.error('방 참가 실패:', err);
+            setInviteCodeError('서버 오류로 방 참가에 실패했습니다.');
+        }
     };
 
     return (
