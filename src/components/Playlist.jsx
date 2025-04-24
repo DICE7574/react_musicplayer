@@ -5,6 +5,15 @@ import { socket } from '../socket';
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
+function formatDuration(iso) {
+    const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return '-';
+    const [, h, m, s] = match.map(x => parseInt(x || '0', 10));
+    const totalMinutes = (h * 60) + m;
+    const seconds = s.toString().padStart(2, '0');
+    return `${totalMinutes}:${seconds}`;
+}
+
 export default function PlaylistSearch({ className = '', playlist = [] }) {
     const [search, setSearch] = useState('');
     const [results, setResults] = useState([]);
@@ -30,7 +39,8 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
             videoId: video.id.videoId,
             title: video.snippet.title,
             channel: video.snippet.channelTitle,
-            thumbnail: video.snippet.thumbnails.default.url
+            thumbnail: video.snippet.thumbnails.default.url,
+            duration: video.contentDetails?.duration || ''
         };
         socket.emit('add-to-playlist', song);
         setResults([]); // 추가 후 검색 결과 닫기
@@ -80,6 +90,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                                     <div>
                                         <div className="fw-bold">{video.snippet.title}</div>
                                         <div className="text-muted small">{video.snippet.channelTitle}</div>
+                                        <div className="text-muted small">길이: {formatDuration(video.contentDetails?.duration || '')}</div>
                                     </div>
                                 </div>
                                 <button
@@ -96,7 +107,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
 
             {/* 현재 플레이리스트 */}
             <div className="mt-4">
-                <h5 className="mb-3">🎵 현재 플레이리스트</h5>
+                <h5 className="mb-3">플레이리스트</h5>
                 {playlist.length === 0 ? (
                     <div className="text-muted">플레이리스트가 비어 있습니다.</div>
                 ) : (
@@ -104,14 +115,17 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                         {playlist.map((song, index) => (
                             <div key={song.id} className="d-flex justify-content-between align-items-center border rounded px-3 py-2">
                                 <div className="d-flex align-items-center gap-3">
-                                    <img src={song.thumbnail} alt={song.title} style={{ width: 64, height: 48 }} className="rounded" />
+                                    <img src={song.thumbnail} alt={song.title} style={{ width: 80, height: 60 }} className="rounded" />
                                     <div>
                                         <div className="fw-bold">{song.title}</div>
                                         <div className="text-muted small">{song.channel}</div>
-                                        <div className="text-muted small">- {song.addedBy}</div>
+                                        <div className="text-muted small">{formatDuration(song.duration)}</div>
                                     </div>
                                 </div>
-                                <span className="text-muted small">#{index + 1}</span>
+                                <div className="d-flex flex-column align-items-end" style={{ minWidth: '120px' }}>
+                                    <div className="text-muted small text-end">#{index + 1}</div>
+                                    <div className="text-muted small text-end">{song.addedBy}</div>
+                                </div>
                             </div>
                         ))}
                     </div>
