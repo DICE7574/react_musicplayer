@@ -91,7 +91,12 @@ function Lobby() {
     };
 
     return (
-        <div style={{ minHeight: '100vh' }} className="d-flex justify-content-center align-items-center bg-light">
+        <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, red, orange, yellow, green, blue, indigo, violet)',
+            backgroundSize: '200% 200%',
+            animation: 'gradientFlow 10s ease infinite'
+        }} className="d-flex justify-content-center align-items-center bg-light">
             <div className="p-5 bg-white shadow rounded" style={{ width: 500 }}>
                 <h2 className="text-center mb-4">
                     <i className="bi bi-music-note-beamed me-2" />로비
