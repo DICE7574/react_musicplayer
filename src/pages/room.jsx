@@ -7,6 +7,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import RoomHeader from '../components/RoomHeader';
+import Playlist from '../components/Playlist';
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -16,13 +17,12 @@ function Room() {
     const navigate = useNavigate();
     const nickname = location.state?.nickname || '익명';
 
-    const youtubeId = "0RkX1mBIjRA";
-    const youtubeListID = "PLeSslQPAX32g8skK9TpiAJWqtobywviTp";
+    const [youtubeId, setYoutubeId ] = useState("0RkX1mBIjRA");
     const playerRef = useRef(null);
 
     const [roomName, setRoomName] = useState('');
     const [members, setMembers] = useState([]);
-    const [playlist, setPlaylist] = useState([]);
+
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -31,6 +31,8 @@ function Room() {
     const [repeatMode, setRepeatMode] = useState("none");
     const [showCode, setShowCode] = useState(false);
     const [copied, setCopied] = useState(false);
+
+    const [playlist, setPlaylist] = useState([]);
 
     useEffect(() => {
         const connectAndFetch = async () => {
@@ -189,8 +191,6 @@ function Room() {
                     width: '0',
                     height: '0',
                     playerVars: {
-                        listType: 'playlist',
-                        list: youtubeListID,
                         autoplay: 0
                     },
                 }}
@@ -272,6 +272,11 @@ function Room() {
                         </button>
                     </div>
                 </div>
+            </div>
+            <div className="mt-4">
+                <Playlist
+                    playlist={playlist}
+                />
             </div>
         </div>
     );
