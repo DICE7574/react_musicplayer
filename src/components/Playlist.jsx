@@ -39,7 +39,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
             videoId: video.id.videoId,
             title: video.snippet.title,
             channel: video.snippet.channelTitle,
-            thumbnail: video.snippet.thumbnails.default.url,
+            thumbnail: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default.url,
             duration: video.contentDetails?.duration || ''
         };
         socket.emit('add-to-playlist', song);
@@ -50,8 +50,16 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
         setResults([]);
     };
 
+    function formatViews(viewCount) {
+        const count = parseInt(viewCount, 10);
+        if (isNaN(count)) return '-';
+        if (count >= 1e6) return `${(count / 1e6).toFixed(1)}M views`;
+        if (count >= 1e3) return `${(count / 1e3).toFixed(1)}K views`;
+        return `${count}views`;
+    }
+
     return (
-        <div className={`d-flex flex-column bg-light p-4 ${className}`} style={{ height: '100%' }}>
+        <div className={`d-flex flex-column bg-light p-3  ${className}`}>
             {/* 검색창 */}
             <div className="mb-3 input-group">
                 <input
@@ -71,26 +79,66 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                     </button>
                 )}
             </div>
-
             {/* 결과 리스트 */}
             {results.length > 0 && (
-                <div className="bg-white rounded shadow p-3 overflow-auto" style={{ maxHeight: '500px' }}>
+                <div className="bg-white rounded shadow p-3">
                     <div className="d-flex flex-column gap-2">
                         {results.map((video) => (
                             <div
                                 key={video.id.videoId}
                                 className="d-flex align-items-start gap-3 border rounded px-3 py-2 justify-content-between"
                             >
-                                <div className="d-flex gap-3">
-                                    <img
-                                        src={video.snippet.thumbnails.default.url}
-                                        alt={video.snippet.title}
-                                        className="rounded"
-                                    />
+                                <div className="d-flex gap-3 align-items-center" style={{ flex: 1, minWidth: 0 }}>
+                                    <div className="position-relative" style={{ width: 112, height: 63 }}>
+                                        <img
+                                            src={video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default.url}
+                                            alt={video.snippet.title}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }}
+                                        />
+                                        {video.contentDetails?.duration && (
+                                        <div
+                                            className="position-absolute bottom-0 end-0 px-1 py-0 text-white bg-dark"
+                                            style={{
+                                                fontSize: '12px',
+                                                fontWeight: 500,
+                                                fontFamily: '"Roboto", "Arial", sans-serif',
+                                                margin: '0px',
+                                                opacity: 0.8,
+                                                lineHeight: 1.2,
+                                            }}
+                                        >
+                                            {formatDuration(video.contentDetails?.duration || '')}
+                                        </div>)}
+                                    </div>
                                     <div>
-                                        <div className="fw-bold">{video.snippet.title}</div>
-                                        <div className="text-muted small">{video.snippet.channelTitle}</div>
-                                        <div className="text-muted small">길이: {formatDuration(video.contentDetails?.duration || '')}</div>
+                                        <div
+                                            className="fw-bold"
+                                            style={{
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 1,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            {video.snippet.title}
+                                        </div>
+                                        <div
+                                            className="text-muted small"
+                                            style={{
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 1,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            {video.snippet.channelTitle}
+                                        </div>
+                                        <div className="text-muted small">
+                                            {formatViews(video.statistics?.viewCount)}
+                                        </div>
+
                                     </div>
                                 </div>
                                 <button
@@ -115,16 +163,71 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                         {playlist.map((song, index) => (
                             <div key={song.id} className="d-flex justify-content-between align-items-center border rounded px-3 py-2">
                                 <div className="d-flex align-items-center gap-3">
-                                    <img src={song.thumbnail} alt={song.title} style={{ width: 80, height: 60 }} className="rounded" />
+                                    <div style={{ width: 80, height: 45, position: 'relative' }}>
+                                        <img
+                                            src={song.thumbnail}
+                                            alt={song.title}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover', // 'contain' → 'cover'로 바꿔 YouTube 스타일로
+                                                borderRadius: 4,
+                                            }}
+                                        />
+                                        {song.duration && (
+                                            <div
+                                                className="position-absolute bottom-0 end-0 px-1 text-white bg-dark"
+                                                style={{
+                                                    fontSize: '12px',
+                                                    fontWeight: 500,
+                                                    fontFamily: '"Roboto", "Arial", sans-serif',
+                                                    margin: '0px',
+                                                    opacity: 0.8,
+                                                    lineHeight: 1.2,
+                                                }}
+                                            >
+                                                {formatDuration(song.duration)}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div>
-                                        <div className="fw-bold">{song.title}</div>
-                                        <div className="text-muted small">{song.channel}</div>
-                                        <div className="text-muted small">{formatDuration(song.duration)}</div>
+                                        <div
+                                            className="fw-bold"
+                                            style={{
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 1,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            {song.title}
+                                        </div>
+                                        <div
+                                            className="text-muted small"
+                                            style={{
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 1,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            {song.channel}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="d-flex flex-column align-items-end" style={{ minWidth: '120px' }}>
-                                    <div className="text-muted small text-end">#{index + 1}</div>
-                                    <div className="text-muted small text-end">{song.addedBy}</div>
+                                <div className="d-flex align-items-center">
+                                    <div className="d-flex flex-column text-end me-2">
+                                        <div className="text-muted small">#{index + 1}</div>
+                                        <div className="text-muted small">{song.addedBy}</div>
+                                    </div>
+                                    <button
+                                        className="btn btn-sm btn-outline-danger"
+                                        onClick={() => socket.emit('remove-from-playlist', song.id)}
+                                    >
+                                        <i className="bi bi-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                         ))}

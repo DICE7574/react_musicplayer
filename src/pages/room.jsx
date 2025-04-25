@@ -162,29 +162,31 @@ function Room() {
         navigate('/');
     };
 
-
     useEffect(() => {
         const handleBeforeUnload = (e) => {
             e.preventDefault();
             e.returnValue = ''; // 경고 창 띄우기
         };
 
-        const handlePageHide = () => {
+        const handleExit = () => {
             socket.emit('leave-room', { roomCode });
             socket.disconnect();
+            navigate('/');
         };
 
         window.addEventListener('beforeunload', handleBeforeUnload);
-        window.addEventListener('pagehide', handlePageHide); // 진짜 떠날 때 실행됨
+        window.addEventListener('pagehide', handleExit);     // 새로고침, 탭 닫기
+        window.addEventListener('popstate', handleExit);     // 뒤로가기
 
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
-            window.removeEventListener('pagehide', handlePageHide);
+            window.removeEventListener('pagehide', handleExit);
+            window.removeEventListener('popstate', handleExit);
         };
-    }, [roomCode]);
+    }, [roomCode, navigate]);
 
     return (
-        <div className="container mt-4 position-relative">
+        <div className="container p-0 mt-0 position-relative">
             <YouTube
                 videoId={youtubeId}
                 opts={{
@@ -196,7 +198,13 @@ function Room() {
                 }}
                 onReady={onReady}
                 onStateChange={updateVideoInfo}
-                style={{ pointerEvents: 'none' }}
+                style={{
+                    pointerEvents: 'none',
+                    width: 0,
+                    height: 0,
+                    margin: 3,
+                    padding: 0,
+                }}
             />
 
             {/* 상단 정보 */}
@@ -238,16 +246,18 @@ function Room() {
                         <button className="btn btn-light" onClick={playNext}>
                             <i className="bi bi-skip-forward-fill"></i>
                         </button>
-                        <span className="text-muted small">
+                        <span className="text-muted text-nowrap small">
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
                     </div>
 
                     {/* 가운데: 노래 정보 (임시 텍스트) */}
-                    <div className="text-center flex-grow-1">
-                        <span className="text-secondary d-block">노래 제목</span>
-                        <span className="text-secondary d-block">아티스트 정보</span>
-                    </div>
+                    {playlist.length > 0 && (
+                        <div className="text-center text-truncate mb-3">
+                            <div className="fw-bold text-truncate">{playlist[0].title}</div>
+                            <div className="text-muted text-truncate small">{playlist[0].channel}</div>
+                        </div>
+                    )}
 
                     {/* 오른쪽: 음소거 및 볼륨 */}
                     <div className="d-flex align-items-center gap-2">
@@ -273,10 +283,11 @@ function Room() {
                     </div>
                 </div>
             </div>
-            <div className="mt-4">
-                <Playlist
-                    playlist={playlist}
-                />
+            <div
+                className="mt-1 overflow-auto"
+                style={{ height: '100%', maxHeight: 'calc(100vh - 225px)' }}
+            >
+                <Playlist playlist={playlist} />
             </div>
         </div>
     );

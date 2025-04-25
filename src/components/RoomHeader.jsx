@@ -2,7 +2,7 @@ import React from 'react';
 
 function RoomHeader({ roomName, roomCode, members, nickname, showCode, setShowCode, copyToClipboard, copied, handleLeaveRoom }) {
     return(
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex justify-content-between align-items-center mb-1">
             <div className="dropdown me-2">
                 <button
                     className="btn btn-outline-secondary btn-sm dropdown-toggle"

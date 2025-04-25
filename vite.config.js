@@ -8,4 +8,8 @@ export default defineConfig({
             external: ['electron'],
         },
     },
+    server: {
+        host: true,
+        port: 5173
+    },
 });

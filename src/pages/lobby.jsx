@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+const API = import.meta.env.VITE_API_BASE_URL;
 
 function Lobby() {
     const navigate = useNavigate();
@@ -33,7 +34,7 @@ function Lobby() {
         if (hasError) return;
 
         try {
-            const res = await fetch('http://localhost:3001/room/create', {
+            const res = await fetch(`${API}/room/create`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomTitle: roomTitle.trim() })
@@ -45,6 +46,7 @@ function Lobby() {
             }
         } catch (err) {
             console.error('방 생성 실패:', err);
+            setRoomTitleError('서버 오류...');
         }
     };
 
@@ -69,7 +71,7 @@ function Lobby() {
         if (hasError) return;
 
         try {
-            const res = await fetch('http://localhost:3001/room/join', {
+            const res = await fetch(`${API}/room/join`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -86,20 +88,17 @@ function Lobby() {
             }
         } catch (err) {
             console.error('방 참가 실패:', err);
-            setInviteCodeError('서버 오류로 방 참가에 실패했습니다.');
+            setInviteCodeError('서버 오류...');
         }
     };
 
     return (
         <div style={{
             minHeight: '100vh',
-            background: 'linear-gradient(135deg, red, orange, yellow, green, blue, indigo, violet)',
-            backgroundSize: '200% 200%',
-            animation: 'gradientFlow 10s ease infinite'
         }} className="d-flex justify-content-center align-items-center bg-light">
             <div className="p-5 bg-white shadow rounded" style={{ width: 500 }}>
                 <h2 className="text-center mb-4">
-                    <i className="bi bi-music-note-beamed me-2" />로비
+                    로비
                 </h2>
 
                 {/* 닉네임 입력 */}
