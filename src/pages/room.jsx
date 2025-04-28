@@ -8,6 +8,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import RoomHeader from '../components/RoomHeader';
 import Playlist from '../components/Playlist';
+import { decode } from 'html-entities';
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -26,6 +27,7 @@ function Room() {
     const [isMuted, setIsMuted] = useState(false);
     const [showCode, setShowCode] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [hasSynced, setHasSynced] = useState(false);
 
     // 서버와 함께 처리하는 변수
     const [roomName, setRoomName] = useState('');
@@ -50,7 +52,7 @@ function Room() {
                     navigate('/');
                     return;
                 }
-
+                setHasSynced(false);
                 setIsPlaying(res.state.isPlaying);
                 setRepeatMode(res.state.repeatMode);
                 setCurrentTime(res.state.currentTime);
@@ -121,42 +123,69 @@ function Room() {
     const onReady = (event) => {
         playerRef.current = event.target;
         updateVideoInfo(event);
-        event.target.setVolume(volume * volumsScale);
 
-        if (isPlaying) {
-            event.target.playVideo();
+        if (playerRef.current) {
+            if (isMuted) {
+                playerRef.current.mute();
+            } else {
+                playerRef.current.unMute();
+            }
+            playerRef.current.setVolume(volume * volumsScale);
             playerRef.current.seekTo(currentTime, true);
-        } else {
-            event.target.pauseVideo();
-            playerRef.current.seekTo(currentTime, true);
+            isPlaying ? playerRef.current.playVideo() : playerRef.current.pauseVideo();
         }
-        setTimeout(() => {
-            syncPlayer();
-        }, 500);
     };
 
     const updateVideoInfo = (event) => {
-        if (event && event.data === 0) { // 영상 종료되었을 때
-            if (repeatMode === "one") {
-                // 같은 영상 반복
-                playerRef.current.seekTo(0, true);
-            } else if (repeatMode === "all") {
-                // 전체 반복
-                if (currentIndex + 1 >= playlist.length) {
-                    // 마지막 곡이면 첫 곡으로
-                    playVideoAt(0, 0);
-                } else {
-                    autoNext();
+        if (!event) return;
+        console.log('이벤트 타입 (event.data):', event.data);
+
+        if (event.data === -1) {
+            //영상 시작 안할때 재생 시도
+            setTimeout(() => {
+                if (!playerRef.current) return;
+                const playerState = playerRef.current.getPlayerState();
+                if (playerState === -1) {
+                    playerRef.current.playVideo(); // 강제 play
+                    playerRef.current.seekTo(currentTime, true);
                 }
-            } else {
-                autoNext();
+            }, 1000); // 1초 후에 복구 시도
+        }
+
+        if (event.data === 1) {
+            if (!hasSynced) {
+                console.log('싱크 맞출 시도 진행');
+                syncPlayer();
+                setHasSynced(true);
+            }
+        }
+
+        if (event.data === 0) { // 영상 종료
+            console.log('영상 종료됨');
+            switch (repeatMode) {
+                case 'one':
+                    console.log('반복 모드: 한곡');
+                    playerRef.current?.seekTo(0, true);
+                    break;
+                case 'all':
+                    console.log('반복 모드: 전체');
+                    currentIndex + 1 >= playlist.length ? playVideoAt(0, 0) : autoNext();
+                    setHasSynced(false);
+                    break;
+                default:
+                    console.log('다음 곡으로');
+                    autoNext();
+                    setHasSynced(false);
+                    break;
             }
         }
 
         if (playerRef.current) {
-            setDuration(playerRef.current.getDuration());
+            const duration = playerRef.current.getDuration();
+            setDuration(duration);
         }
     };
+
 
     const togglePlayPause = () => {
         socket.emit('toggle-play-pause', { roomCode });
@@ -193,10 +222,15 @@ function Room() {
     const autoNext = () => {
         if (currentIndex + 1 < playlist.length) {
             playVideoAt(currentIndex + 1, 0);
+            if (members[0] === nickname)
+            {
+                socket.emit('play-video-at', {roomCode: roomCode, index: currentIndex + 1, time: 0});
+            }
         }
     };
 
     const playVideoAt = (index, time) => {
+        setHasSynced(false);
         setCurrentIndex(index);
         playerRef.current.seekTo(time, true);
     };
@@ -206,26 +240,36 @@ function Room() {
 
         socket.emit('request-sync', { roomCode });
 
-        socket.once('sync-info', ({ isPlaying, currentTime, currentIndex, repeatMode }) => {
+        socket.once('sync-info', ({ isPlaying, currentTime, currentIndex: newIndex, repeatMode }) => {
             if (!playerRef.current) return;
 
-            if (currentIndex !== currentIndex) {
-                playVideoAt(currentIndex, currentTime);
+            const playerCurrentTime = playerRef.current.getCurrentTime();
+
+            if (newIndex !== currentIndex) {
+                playVideoAt(newIndex, currentTime);
             } else {
-                playerRef.current.seekTo(currentTime, true);
+                const timeDiff = Math.abs(playerCurrentTime - currentTime);
+
+                if (timeDiff > 1) { // 🔥 2초 이상 차이날 때만 seekTo
+                    console.log(`▶ 시간 차이 ${timeDiff.toFixed(1)}초 → 싱크 조정`);
+                    playerRef.current.seekTo(currentTime, true);
+                } else {
+                    console.log(`▶ 시간 차이 ${timeDiff.toFixed(1)}초 → 싱크 무시`);
+                }
             }
+
             if (isPlaying) {
                 playerRef.current.playVideo();
             } else {
                 playerRef.current.pauseVideo();
             }
+
             setIsPlaying(isPlaying);
             setCurrentTime(currentTime);
-            setCurrentIndex(currentIndex);
+            setCurrentIndex(newIndex);
             setRepeatMode(repeatMode);
         });
     };
-
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -236,7 +280,7 @@ function Room() {
                     socket.emit('update-current-time', { roomCode, time: now });
                 }
             }
-        }, 500);
+        }, 200);
         return () => clearInterval(interval);
     }, [isPlaying, members, nickname, roomCode]);
 
@@ -252,7 +296,6 @@ function Room() {
         setIsMuted(!isMuted);
         if (playerRef.current) {
             isMuted ? playerRef.current.unMute() : playerRef.current.mute();
-            if (isMuted) playerRef.current.setVolume(volume * volumsScale);
         }
     };
 
@@ -323,12 +366,12 @@ function Room() {
             )}
 
             {playlist[currentIndex] && (
-                <div style={{ position: 'fixed', top: 1000, left: 0, width: '320px', height: '180px', zIndex: 9999, background: 'black' }}>
+                <div style={{ position: 'fixed', top: 50, left: 20, width: '240px', height: '135px', zIndex: 9999, background: 'black' }}>
                     <YouTube
                         videoId={playlist[currentIndex].videoId}
                         opts={{
-                            width: '320',
-                            height: '180',
+                            width: '240',
+                            height: '135',
                             playerVars: {
                                 autoplay: isPlaying ? 1 : 0
                             },
@@ -339,9 +382,7 @@ function Room() {
                             console.error('유튜브 에러 발생', e.data);
                         }}
                         style={{
-                            pointerEvents: 'auto', // 클릭 가능
-                            width: '100%',
-                            height: '100%',
+                            pointerEvents: 'false', // 클릭 가능
                         }}
                     />
                 </div>
@@ -358,6 +399,7 @@ function Room() {
                 copyToClipboard={copyToClipboard}
                 copied={copied}
                 handleLeaveRoom={handleLeaveRoom}
+                syncPlayer={syncPlayer}
             />
 
             {/* 플레이어 */}
@@ -389,19 +431,22 @@ function Room() {
                         <span className="text-muted text-nowrap small">
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
+                        <button className="btn btn-light" onClick={syncPlayer}>
+                            <i className="bi bi-record-fill"></i>
+                        </button>
                     </div>
 
                     {/* 가운데: 노래 정보 (임시 텍스트) */}
                     {playlist.length > 0 && (
                         <div className="text-center text-truncate mb-0">
-                            <div className="fw-bold text-truncate">{playlist[currentIndex].title}</div>
-                            <div className="text-muted text-truncate small">{playlist[currentIndex].channel}</div>
+                            <div className="fw-bold text-truncate">{decode(playlist[currentIndex].title)}</div>
+                            <div className="text-muted text-truncate small">{decode(playlist[currentIndex].channel)}</div>
                         </div>
                     )}
 
                     {/* 오른쪽: 음소거 및 볼륨 */}
                     <div className="d-flex align-items-center gap-2">
-                        <button className="btn btn-light" onClick={toggleMute}>
+                        <button className={`btn ${isMuted ? 'btn-dark' : 'btn-light'}`} onClick={toggleMute}>
                             <i className={`bi ${isMuted ? 'bi-volume-mute' : 'bi-volume-up'}`}></i>
                         </button>
                         <input

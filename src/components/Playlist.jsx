@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { socket } from '../socket';
+import {decode} from "html-entities";
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -14,7 +15,7 @@ function formatDuration(iso) {
     return `${totalMinutes}:${seconds}`;
 }
 
-export default function PlaylistSearch({ className = '', playlist = [] }) {
+export default function PlaylistSearch({ className = '', playlist = [], currentIndex = -1 }) {
     const [search, setSearch] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -92,7 +93,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                                     <div className="position-relative" style={{ width: 112, height: 63 }}>
                                         <img
                                             src={video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default.url}
-                                            alt={video.snippet.title}
+                                            alt={decode(video.snippet.title)}
                                             style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }}
                                         />
                                         {video.contentDetails?.duration && (
@@ -121,7 +122,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                                                 textOverflow: 'ellipsis'
                                             }}
                                         >
-                                            {video.snippet.title}
+                                            {decode(video.snippet.title)}
                                         </div>
                                         <div
                                             className="text-muted small"
@@ -133,7 +134,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                                                 textOverflow: 'ellipsis'
                                             }}
                                         >
-                                            {video.snippet.channelTitle}
+                                            {decode(video.snippet.channelTitle)}
                                         </div>
                                         <div className="text-muted small">
                                             {formatViews(video.statistics?.viewCount)}
@@ -161,12 +162,15 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                 ) : (
                     <div className="d-flex flex-column gap-2">
                         {playlist.map((song, index) => (
-                            <div key={song.id} className="d-flex justify-content-between align-items-center border rounded px-3 py-2">
+                            <div
+                                key={song.id}
+                                className={`d-flex justify-content-between align-items-center border rounded px-3 py-2 ${currentIndex === index ? 'bg-secondary' : ''}`}
+                            >
                                 <div className="d-flex align-items-center gap-3">
                                     <div style={{ width: 80, height: 45, position: 'relative' }}>
                                         <img
                                             src={song.thumbnail}
-                                            alt={song.title}
+                                            alt={decode(song.title)}
                                             style={{
                                                 width: '100%',
                                                 height: '100%',
@@ -201,7 +205,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                                                 textOverflow: 'ellipsis'
                                             }}
                                         >
-                                            {song.title}
+                                            {decode(song.title)}
                                         </div>
                                         <div
                                             className="text-muted small"
@@ -213,7 +217,7 @@ export default function PlaylistSearch({ className = '', playlist = [] }) {
                                                 textOverflow: 'ellipsis'
                                             }}
                                         >
-                                            {song.channel}
+                                            {decode(song.channel)}
                                         </div>
                                     </div>
                                 </div>
