@@ -101,10 +101,12 @@ function Room() {
             setRepeatMode(mode);
         };
         const handlePlayVideoAt = ({ roomCode, index, time }) => {
-            playVideoAt(index, time);
+            if(roomCode === roomCode)
+                playVideoAt(index, time);
         };
         const handleUpdateCurrentIndex = ({ roomCode, index }) => {
-            setCurrentIndex(index);
+            if(roomCode === roomCode)
+                setCurrentIndex(index);
         };
 
         socket.on('update-members', handleMemberUpdate);
@@ -169,8 +171,7 @@ function Room() {
 
                 if (playerState !== -1) {
                     console.log('▶ Player 준비 완료 → 강제 재생');
-                    playerRef.current.playVideo();
-                    playerRef.current.seekTo(currentTime, true);
+                    syncPlayer();
                     setFirstLoad(false); // 🔥 이후 반복 막기
                     clearInterval(interval);
                 }
