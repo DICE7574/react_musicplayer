@@ -1,6 +1,6 @@
 import React from 'react';
 
-function RoomHeader({ roomName, roomCode, members, nickname, showCode, setShowCode, copyToClipboard, copied, handleLeaveRoom }) {
+function RoomHeader({ roomName, roomCode, members, id, showCode, setShowCode, copyToClipboard, copied, handleLeaveRoom }) {
     return(
         <div className="d-flex justify-content-between align-items-center mb-1">
             <div className="dropdown me-2">
@@ -13,11 +13,11 @@ function RoomHeader({ roomName, roomCode, members, nickname, showCode, setShowCo
                     {members.length} <i className="bi bi-people-fill"></i>
                 </button>
                 <ul className="dropdown-menu">
-                    {members.map((name, idx) => (
-                        <li key={idx}>
-                            <div className={`dropdown-item d-flex justify-content-between align-items-center ${name === nickname ? 'bg-secondary text-white' : ''}`}>
-                                <span>{name}</span>
-                                {idx === 0 && <span className="ms-2">⭐</span>}
+                    {members.map((member) => (
+                        <li key={member.id}>
+                            <div className={`dropdown-item d-flex justify-content-between align-items-center ${member.id === id ? 'bg-secondary text-white' : ''}`}>
+                                <span>{member.name}</span>
+                                {members[0]?.id === member.id && <span className="ms-2">⭐</span>}
                             </div>
                         </li>
                     ))}

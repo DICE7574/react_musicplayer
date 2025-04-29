@@ -16,9 +16,9 @@ function formatDuration(iso) {
 }
 
 export default function PlaylistSearch({ className = '', playlist = [], currentIndex = -1 }) {
-    const [search, setSearch] = useState('');
-    const [results, setResults] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [search, setSearch] = useState(''); //검색어
+    const [results, setResults] = useState([]); //검색결과 저장
+    const [loading, setLoading] = useState(false); //로딩 중 상태
 
     const handleSearch = async () => {
         if (!search.trim()) return;
@@ -44,14 +44,14 @@ export default function PlaylistSearch({ className = '', playlist = [], currentI
             duration: video.contentDetails?.duration || ''
         };
         socket.emit('add-to-playlist', song);
-        setResults([]); // 추가 후 검색 결과 닫기
+        handleClearResults(); // 추가 후 검색 결과 닫기
     };
 
     const handleClearResults = () => {
         setResults([]);
     };
 
-    function formatViews(viewCount) {
+    function formatViews(viewCount) { // 조회수 숫자에서 천 단위 구분하는 string으로
         const count = parseInt(viewCount, 10);
         if (isNaN(count)) return '-';
         if (count >= 1e6) return `${(count / 1e6).toFixed(1)}M views`;
@@ -174,7 +174,7 @@ export default function PlaylistSearch({ className = '', playlist = [], currentI
                                             style={{
                                                 width: '100%',
                                                 height: '100%',
-                                                objectFit: 'cover', // 'contain' → 'cover'로 바꿔 YouTube 스타일로
+                                                objectFit: 'cover',
                                                 borderRadius: 4,
                                             }}
                                         />

@@ -13,7 +13,7 @@ function Lobby() {
     const [roomTitleError, setRoomTitleError] = useState('');
     const [inviteCodeError, setInviteCodeError] = useState('');
 
-    // ✅ 방 생성
+    //방 생성
     const handleCreateRoom = async () => {
         let hasError = false;
 
@@ -50,7 +50,7 @@ function Lobby() {
         }
     };
 
-    // ✅ 방 참가
+    //방 참가
     const handleJoinRoom = async () => {
         let hasError = false;
 
