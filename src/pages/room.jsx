@@ -34,6 +34,7 @@ function Room() {
     const [roomName, setRoomName] = useState('');
     const [members, setMembers] = useState([]);
     const [isPlaying, setIsPlaying] = useState(true);
+    const [isEnded, setIsEnded] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [repeatMode, setRepeatMode] = useState("none");
@@ -53,11 +54,12 @@ function Room() {
                     navigate('/');
                     return;
                 }
-                setHasSynced(false);
+                setHasSynced(true);
                 setIsPlaying(res.state.isPlaying);
                 setRepeatMode(res.state.repeatMode);
                 setCurrentTime(res.state.currentTime);
                 setCurrentIndex(res.state.currentIndex);
+                setIsEnded(res.state.isEnded);
 
                 try {
                     const [titleRes, membersRes, playlistRes] = await Promise.all([
@@ -91,6 +93,10 @@ function Room() {
             }
             setIsPlaying(isPlaying);
         };
+        const handleUpdateIsEnded = ({ isEnded }) => {
+            setIsEnded(isEnded);
+        };
+
         const handleSeekedTo = ({ time }) => {
             if (playerRef.current) {
                 playerRef.current.seekTo(time, true);
@@ -100,18 +106,18 @@ function Room() {
         const handleRepeatModeChanged = ({ mode }) => {
             setRepeatMode(mode);
         };
-        const handlePlayVideoAt = ({ roomCode, index, time }) => {
-            if(roomCode === roomCode)
-                playVideoAt(index, time);
+        const handlePlayVideoAt = ({ index, time, plist }) => {
+            playVideoAt(index, time, plist);
         };
-        const handleUpdateCurrentIndex = ({ roomCode, index }) => {
-            if(roomCode === roomCode)
-                setCurrentIndex(index);
+        const handleUpdateCurrentIndex = ({ index }) => {
+            setCurrentIndex(index);
+            console.log('setCurrentIndex, ', index);
         };
 
         socket.on('update-members', handleMemberUpdate);
         socket.on('update-playlist', handlePlaylistUpdate);
         socket.on('play-pause-toggled', handlePlayPauseToggled);
+        socket.on('update-is-ended', handleUpdateIsEnded);
         socket.on('seeked-to', handleSeekedTo);
         socket.on('repeat-mode-changed', handleRepeatModeChanged);
         socket.on('play-video-at', handlePlayVideoAt);
@@ -121,6 +127,7 @@ function Room() {
             socket.off('update-members', handleMemberUpdate);
             socket.off('update-playlist', handlePlaylistUpdate);
             socket.off('play-pause-toggled', handlePlayPauseToggled);
+            socket.off('update-is-ended', handleUpdateIsEnded);
             socket.off('seeked-to', handleSeekedTo);
             socket.off('repeat-mode-changed', handleRepeatModeChanged);
             socket.off('play-video-at', handlePlayVideoAt);
@@ -131,7 +138,6 @@ function Room() {
     const onReady = (event) => {
         playerRef.current = event.target;
         console.log('이벤트 타입 (event.data):', event.data);
-        //updateVideoInfo(event);
         if (playerRef.current) {
             applyVolumeSettings();
             playerRef.current.seekTo(currentTime, true);
@@ -163,7 +169,7 @@ function Room() {
                 }
 
                 // 2. 시간 초과 시 중단
-                if (Date.now() - startTime > 5000) { // 🔥 5초 제한
+                if (Date.now() - startTime > 5000) { // 5초 제한
                     console.warn('⚠️ 반복 제한 시간 초과 → 반복 종료');
                     clearInterval(interval);
                     return;
@@ -172,13 +178,18 @@ function Room() {
                 if (playerState !== -1) {
                     console.log('▶ Player 준비 완료 → 강제 재생');
                     syncPlayer();
-                    setFirstLoad(false); // 🔥 이후 반복 막기
+                    setFirstLoad(false); // 이후 반복 막기
                     clearInterval(interval);
                 }
             }, 200);
         }
 
-        if (event.data === 1) { // 노래 시작 후 싱크 맞추기
+        if (event.data === 1) { // 노래 시작 후 로직
+            if (members[0]?.id === socket.id && isEnded) { //방장이 IsEnded(false); 자동으로 처리
+                setIsEnded(false);
+                updateIsEnded(false);
+            }
+
             setFirstLoad(false); // 시작한 경우 강제 play 비활성화
             if (!hasSynced) {
                 console.log('싱크 맞출 시도 진행');
@@ -210,6 +221,8 @@ function Room() {
                                 else
                                 {
                                     console.log('노래 끝나서 영상 정지됨');
+                                    setIsEnded(true);
+                                    updateIsEnded(true);
                                 }
                                 break;
                         }
@@ -226,9 +239,12 @@ function Room() {
         }
     };
 
-
     const togglePlayPause = () => {
         socket.emit('toggle-play-pause', { roomCode });
+    };
+
+    const updateIsEnded = (newState) => {
+        socket.emit('update-is-ended', { roomCode, isEnded: newState });
     };
 
     const handleSeek = (e) => {
@@ -261,19 +277,23 @@ function Room() {
 
     const autoGoto = (inputIndex, inputTime) => {
         if (inputIndex < playlist.length) {
-            playVideoAt(inputIndex, inputTime);
+            playVideoAt(inputIndex, inputTime, playlist);
             if (members[0]?.id === socket.id)
             {
-                socket.emit('update-current-index', {roomCode: roomCode, index: inputIndex, time: inputTime});
+                socket.emit('update-current-index', { ndex: inputIndex });
             }
         }
     };
 
-    const playVideoAt = (index, time) => {
+    const playVideoAt = (index, time, playlist) => {
+        console.log('-----play-video-at', { index, time });
+        console.log('currentVideoId', playerRef.current.getVideoData().video_id);
+        console.log('nextVideoId', playlist[index]?.videoId);
         if (!playerRef.current) return;
 
         const currentVideoId = playerRef.current.getVideoData().video_id;
         const nextVideoId = playlist[index]?.videoId;
+
         if(currentVideoId !== nextVideoId) {
             setHasSynced(false);
             setCurrentIndex(index);
@@ -288,6 +308,10 @@ function Room() {
     const syncPlayer = () => {
         if (!socket.connected) return;
 
+        if (isEnded) {
+            return;
+        }
+
         socket.emit('request-sync', { roomCode });
 
         socket.once('sync-info', ({ isPlaying, currentTime, currentIndex: newIndex, repeatMode }) => {
@@ -296,7 +320,7 @@ function Room() {
             const playerCurrentTime = playerRef.current.getCurrentTime();
 
             if (newIndex !== currentIndex) {
-                playVideoAt(newIndex, currentTime);
+                playVideoAt(newIndex, currentTime, playlist);
             } else {
                 const timeDiff = Math.abs(playerCurrentTime - currentTime);
 
@@ -420,21 +444,19 @@ function Room() {
         <div className="container p-0 mt-0 position-relative">
             {DEBUG && (
                 <div style={{ position: 'absolute', top: 10, left: 500, background: 'white', padding: '10px', zIndex: 9999 }}>
-                    <div>isPlaying: {isPlaying ? 'true' : 'false'}</div>
-                    <div>repeatMode: {repeatMode}</div>
                     <div>currentTime: {(currentTime ?? 0).toFixed(1)}</div>
-                    <div>currentIndex: {currentIndex} {(playlist[currentIndex]?.videoId ?? 0)}</div>
-                    <div>{members[0]?.id} === {socket.id} is {String(members[0]?.id === socket.id)}</div>
+                    <div>currentIndex: {String(currentIndex)} {String(playlist[currentIndex]?.videoId ?? 0)}</div>
+                    <div>isEnded: {String(isEnded)}</div>
                 </div>
             )}
 
             {playlist[currentIndex] && (
-                <div style={{ position: 'fixed', top: 50, left: 20, width: '0', height: '0', zIndex: 9999, background: 'black' }}>
+                <div style={{ position: 'fixed', top: 50, left: 20, width: '160', height: '90', zIndex: 9999, background: 'black' }}>
                     <YouTube
                         videoId={playlist[currentIndex].videoId}
                         opts={{
-                            width: '0',
-                            height: '0',
+                            width: '160',
+                            height: '90',
                             playerVars: {
                                 autoplay: isPlaying ? 1 : 0
                             },
@@ -463,7 +485,6 @@ function Room() {
                 copyToClipboard={copyToClipboard}
                 copied={copied}
                 handleLeaveRoom={handleLeaveRoom}
-                syncPlayer={syncPlayer}
             />
 
             {/* 플레이어 */}
@@ -495,16 +516,16 @@ function Room() {
                         <span className="text-muted text-nowrap small">
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
-                        <button className="btn btn-light" onClick={syncPlayer}>
-                            <i className="bi bi-record-fill"></i>
+                        <button className="btn btn-outline-secondary" onClick={syncPlayer}>
+                            <i className="bi bi-cloud-arrow-down"></i>
                         </button>
                     </div>
 
                     {/* 가운데: 노래 정보 (임시 텍스트) */}
                     {playlist.length > 0 && (
                         <div className="text-center text-truncate mb-0">
-                            <div className="fw-bold text-truncate">{decode(playlist[currentIndex].title)}</div>
-                            <div className="text-muted text-truncate small">{decode(playlist[currentIndex].channel)}</div>
+                            <div className="fw-bold text-truncate">{decode(playlist[currentIndex]?.title)}</div>
+                            <div className="text-muted text-truncate small">{decode(playlist[currentIndex]?.channel)}</div>
                         </div>
                     )}
 
