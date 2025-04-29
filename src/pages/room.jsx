@@ -29,6 +29,22 @@ function Room() {
     const [copied, setCopied] = useState(false);
     const [hasSynced, setHasSynced] = useState(false);
     const [firstLoad, setFirstLoad] = useState(true);
+    const [disabledButtons, setDisabledButtons] = useState({
+        previous: false,
+        next: false,
+        sync: false,
+    });
+
+    const handleDelayedClick = (actionKey, actionFn) => {
+        if (disabledButtons[actionKey]) return; // 이미 비활성화면 무시
+
+        actionFn(); // 원래 동작 실행
+        setDisabledButtons(prev => ({ ...prev, [actionKey]: true }));
+
+        setTimeout(() => {
+            setDisabledButtons(prev => ({ ...prev, [actionKey]: false }));
+        }, 1000);
+    };
 
     // 서버와 함께 처리하는 변수
     const [roomName, setRoomName] = useState('');
@@ -137,7 +153,6 @@ function Room() {
 
     const onReady = (event) => {
         playerRef.current = event.target;
-        console.log('이벤트 타입 (event.data):', event.data);
         if (playerRef.current) {
             applyVolumeSettings();
             playerRef.current.seekTo(currentTime, true);
@@ -280,7 +295,7 @@ function Room() {
             playVideoAt(inputIndex, inputTime, playlist);
             if (members[0]?.id === socket.id)
             {
-                socket.emit('update-current-index', { ndex: inputIndex });
+                socket.emit('update-current-index', { roomCode: roomCode, index: inputIndex });
             }
         }
     };
@@ -450,7 +465,7 @@ function Room() {
                 </div>
             )}
 
-            {playlist[currentIndex] && (
+            {(playlist[currentIndex])&& (
                 <div style={{ position: 'fixed', top: 50, left: 20, width: '160', height: '90', zIndex: 9999, background: 'black' }}>
                     <YouTube
                         videoId={playlist[currentIndex].videoId}
@@ -504,19 +519,35 @@ function Room() {
                 <div className="d-flex justify-content-between align-items-center">
                     {/* 왼쪽: 이전/재생/다음 + 현재시간 */}
                     <div className="d-flex align-items-center gap-2">
-                        <button className="btn btn-light" onClick={playPrevious}>
+                        <button
+                            className={`btn ${disabledButtons.previous ? 'btn-secondary' : 'btn-light'}`}
+                            onClick={() => handleDelayedClick('previous', playPrevious)}
+                            disabled={disabledButtons.previous}
+                        >
                             <i className="bi bi-skip-backward-fill"></i>
                         </button>
+
                         <button className="btn btn-outline-primary" onClick={togglePlayPause}>
                             <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'}`}></i>
                         </button>
-                        <button className="btn btn-light" onClick={playNext}>
+
+                        <button
+                            className={`btn ${disabledButtons.previous ? 'btn-secondary' : 'btn-light'}`}
+                            onClick={() => handleDelayedClick('next', playNext)}
+                            disabled={disabledButtons.next}
+                        >
                             <i className="bi bi-skip-forward-fill"></i>
                         </button>
+
                         <span className="text-muted text-nowrap small">
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
-                        <button className="btn btn-outline-secondary" onClick={syncPlayer}>
+
+                        <button
+                            className={`btn ${disabledButtons.previous ? 'btn-secondary' : 'btn btn-outline-secondary'}`}
+                            onClick={() => handleDelayedClick('sync', syncPlayer)}
+                            disabled={disabledButtons.sync}
+                        >
                             <i className="bi bi-cloud-arrow-down"></i>
                         </button>
                     </div>
